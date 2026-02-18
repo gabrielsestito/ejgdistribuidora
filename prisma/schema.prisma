@@ -1,0 +1,383 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  DRIVER
+  EMPLOYEE
+}
+
+enum OrderStatus {
+  RECEBIDO
+  SEPARANDO
+  SAIU_PARA_ENTREGA
+  ENTREGUE
+  CANCELADO
+}
+
+enum PaymentStatus {
+  PENDENTE
+  PAGO
+  FALHOU
+  ESTORNADO
+}
+
+enum DeliveryStatus {
+  PENDENTE
+  EM_ROTA
+  ENTREGUE
+  FALHOU
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String?
+  password  String
+  role      UserRole @default(CUSTOMER)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  addresses        Address[]
+  orders           Order[]
+  deliveryAssignments DeliveryAssignment[]
+  employeeDocuments EmployeeDocument[]
+  employeeSchedules EmployeeSchedule[]
+  employeeNotices  EmployeeNotice[]
+
+  @@map("users")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  image       String?   // Upload de imagem
+  active      Boolean   @default(true)
+  showInMenu  Boolean   @default(false) // Mostrar no menu de navegação
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+  baskets Basket[]
+
+  @@map("categories")
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  sku             String?  @unique
+  description     String?  @db.Text
+  detailedDescription Json? // Array de {quantity, name, brand, unit}
+  originalPrice   Decimal? @db.Decimal(10, 2) // Preço original (de)
+  price           Decimal  @db.Decimal(10, 2) // Preço de venda (por)
+  stock           Int      @default(0)
+  weight          Decimal? @db.Decimal(10, 2)
+  weightUnit      String?  @default("kg") // g/kg/ml/l
+  brand           String?  // Marca do produto
+  productType     String   @default("NORMAL") // NORMAL ou KIT
+  images          Json?    // Array de URLs em formato JSON
+  active          Boolean  @default(true)
+  featured        Boolean  @default(false) // Destaque do dia
+  expirationDate  DateTime?
+  wholesalePackSize Int?
+  wholesalePackPrice Decimal? @db.Decimal(10, 2)
+  sellingMode     String   @default("UNIT") // UNIT, PACK, BOTH
+  categoryId      String
+  category        Category @relation(fields: [categoryId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  orderItems      OrderItem[]
+  basketItems     BasketItem[]
+  kitItems        KitItem[] // Itens do kit (se for tipo KIT)
+
+  @@map("products")
+}
+
+model KitItem {
+  id          String   @id @default(cuid())
+  kitId       String   // ID do produto tipo KIT
+  productId   String   // Produto que compõe o kit
+  product     Product  @relation(fields: [productId], references: [id])
+  quantity    Int      @default(1)
+  unit        String?  // g/kg/ml/l
+  brand       String?  // Marca específica do item
+  notes       String?  @db.Text // Observações
+  createdAt   DateTime @default(now())
+
+  @@map("kit_items")
+}
+
+model Basket {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?  @db.Text
+  price       Decimal  @db.Decimal(10, 2)
+  stock       Int      @default(0)
+  weight      Decimal? @db.Decimal(10, 2)
+  images      Json?
+  active      Boolean  @default(true)
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items      BasketItem[]
+  orderItems OrderItem[]
+
+  @@map("baskets")
+}
+
+model BasketItem {
+  id        String   @id @default(cuid())
+  basketId  String
+  basket    Basket   @relation(fields: [basketId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@map("basket_items")
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  street      String
+  number      String
+  complement  String?
+  neighborhood String
+  city        String
+  state       String
+  zipCode     String
+  reference   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders Order[]
+
+  @@map("addresses")
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  code        String      @unique
+  qrCode      String?     @unique // QR Code para impressão e escaneamento
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  addressId   String
+  address     Address     @relation(fields: [addressId], references: [id])
+  status      OrderStatus @default(RECEBIDO)
+  paymentStatus PaymentStatus @default(PENDENTE)
+  subtotal    Decimal     @db.Decimal(10, 2)
+  shipping    Decimal     @db.Decimal(10, 2) @default(0)
+  total       Decimal     @db.Decimal(10, 2)
+  paymentMethod String?   // Mercado Pago, etc
+  paymentMethodDetail String? // Mercado Pago - Pix, Cartão, etc
+  mercadoPagoId String?   // ID do pagamento no Mercado Pago
+  zipCode     String?     // CEP para cálculo de frete
+  distance    Decimal?   @db.Decimal(10, 2) // Distância em km
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  items       OrderItem[]
+  statusLogs  OrderStatusLog[]
+  deliveryAssignments DeliveryAssignment[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+  basketId  String?
+  basket    Basket?  @relation(fields: [basketId], references: [id])
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2) // Preço no momento da compra
+  createdAt DateTime @default(now())
+
+  @@map("order_items")
+}
+
+model OrderStatusLog {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  notes     String?     @db.Text
+  createdAt DateTime    @default(now())
+
+  @@map("order_status_logs")
+}
+
+model DeliveryAssignment {
+  id            String         @id @default(cuid())
+  orderId       String
+  order         Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  driverId      String
+  driver        User           @relation(fields: [driverId], references: [id])
+  status        DeliveryStatus @default(PENDENTE)
+  recipientName String?
+  notes         String?        @db.Text
+  deliveredAt   DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@map("delivery_assignments")
+}
+
+model Banner {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String?  @db.Text
+  description String?  @db.Text
+  image       String?  // URL da imagem ou GIF
+  link        String?  // Link opcional para onde o banner leva
+  bgColor     String   @default("bg-primary") // Cor de fundo (classe Tailwind)
+  textColor   String   @default("text-white") // Cor do texto (classe Tailwind)
+  order       Int      @default(0) // Ordem de exibição
+  active      Boolean  @default(true)
+  isMain      Boolean  @default(false) // Banner principal (menor, em cima) ou carrossel
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("banners")
+}
+
+model ShippingRate {
+  id          String   @id @default(cuid())
+  minDistance Decimal  @db.Decimal(10, 2) // Distância mínima em km
+  maxDistance Decimal  @db.Decimal(10, 2) // Distância máxima em km
+  price       Decimal  @db.Decimal(10, 2) // Preço do frete
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("shipping_rates")
+}
+
+model FreeShippingCity {
+  id        String   @id @default(cuid())
+  city      String
+  state     String   // UF, ex: SP
+  active    Boolean  @default(true)
+  minOrderAmount Decimal @db.Decimal(10, 2) @default(0) // Pedido mínimo para frete grátis
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([city, state])
+  @@map("free_shipping_cities")
+}
+
+model ShippingConfig {
+  id             String   @id @default(cuid())
+  maxDistanceKm  Decimal  @db.Decimal(10, 2) // Raio máximo (km) a partir de Ribeirão Preto
+  minOrderAmount Decimal  @db.Decimal(10, 2) @default(50) // Pedido mínimo global (R$)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("shipping_config")
+}
+
+model StockMovement {
+  id          String   @id @default(cuid())
+  productId   String
+  type        String   // ENTRADA ou SAIDA
+  quantity    Int
+  reason      String?  @db.Text // Motivo da movimentação
+  orderId     String?  // Se relacionado a um pedido
+  createdAt   DateTime @default(now())
+  createdBy   String?  // ID do usuário que fez a movimentação
+
+  @@map("stock_movements")
+}
+
+enum DocumentType {
+  HOLERITE
+  ADVERTENCIA
+  OUTRO
+}
+
+model EmployeeDocument {
+  id          String       @id @default(cuid())
+  employeeId String
+  employee    User         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type        DocumentType
+  title       String
+  description String?      @db.Text
+  fileUrl     String       // URL do arquivo anexado
+  fileName    String       // Nome original do arquivo
+  fileSize    Int?         // Tamanho em bytes
+  createdBy   String       // ID do admin/RH que criou
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("employee_documents")
+}
+
+model EmployeeSchedule {
+  id          String   @id @default(cuid())
+  employeeId String
+  employee   User     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int      // 0 = Domingo, 1 = Segunda, etc
+  startTime  String   // Formato HH:mm
+  endTime    String   // Formato HH:mm
+  breakStart String?  // Formato HH:mm
+  breakEnd   String?  // Formato HH:mm
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("employee_schedules")
+}
+
+model EmployeeNotice {
+  id          String   @id @default(cuid())
+  employeeId String?
+  employee   User?    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  title       String
+  message     String   @db.Text
+  isGeneral   Boolean  @default(false) // Se true, é para todos os funcionários
+  createdBy   String   // ID do admin/RH que criou
+  read        Boolean  @default(false) // Se o funcionário leu
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("employee_notices")
+}
+
+model NavLink {
+  id        String   @id @default(cuid())
+  label     String
+  link      String
+  iconUrl   String?
+  order     Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("nav_links")
+}
