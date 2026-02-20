@@ -59,11 +59,19 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const validated = orderSchema.parse(body)
 
-    if (validated.subtotal < 50) {
-      return NextResponse.json(
-        { error: 'Pedido mínimo é R$ 50,00' },
-        { status: 400 }
-      )
+    try {
+      const cfg = await prisma.shippingConfig.findFirst()
+      const minOrderAmount =
+        cfg && (cfg as any).minOrderAmount !== undefined && (cfg as any).minOrderAmount !== null
+          ? Number((cfg as any).minOrderAmount)
+          : 0
+      if (Number.isFinite(minOrderAmount) && minOrderAmount > 0 && validated.subtotal < minOrderAmount) {
+        return NextResponse.json(
+          { error: `Pedido mínimo é ${formatPrice(minOrderAmount)}` },
+          { status: 400 }
+        )
+      }
+    } catch (e) {
     }
 
     let user = session?.user?.id
@@ -150,18 +158,7 @@ export async function POST(req: NextRequest) {
       data: { qrCode },
     })
 
-    if (user.email) {
-      try {
-        await sendOrderCreatedEmail({
-          to: user.email,
-          name: user.name,
-          code: order.code,
-          total: formatPrice(Number(order.total)),
-        })
-      } catch (emailError) {
-        console.error('Error sending order email:', emailError)
-      }
-    }
+    
 
     const successUrl = new URL('/checkout', siteUrl)
     successUrl.searchParams.set('status', 'success')

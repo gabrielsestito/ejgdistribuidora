@@ -81,6 +81,25 @@ export default function AssignDeliveryPage() {
     }
   }
 
+  const handleUnassign = async () => {
+    if (!confirm('Desatribuir entregador deste pedido?')) return
+    setAssigning(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/admin/orders/${params.id}/assign`, { method: 'DELETE' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setError(data?.error || 'Erro ao desatribuir entrega')
+      } else {
+        router.push('/admin/pedidos')
+      }
+    } catch {
+      setError('Erro ao desatribuir entrega')
+    } finally {
+      setAssigning(false)
+    }
+  }
+
   if (loading) {
     return (
       <AdminLayout>
@@ -142,6 +161,24 @@ export default function AssignDeliveryPage() {
                 <p className="text-sm text-gray-600">Status</p>
                 <p className="font-semibold">{order.status}</p>
               </div>
+              {order?.deliveryAssignments?.[0]?.driver && (
+                <div className="pt-2">
+                  <p className="text-sm text-gray-600">Entregador Atual</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800">
+                      {order.deliveryAssignments[0].driver.name}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleUnassign}
+                      disabled={assigning}
+                    >
+                      Desatribuir
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -157,13 +194,17 @@ export default function AssignDeliveryPage() {
                     <SelectValue placeholder="Selecione um entregador" />
                   </SelectTrigger>
                   <SelectContent>
-                    {drivers
-                      .filter((driver) => driver.active)
-                      .map((driver) => (
+                    {drivers.length === 0 ? (
+                      <div className="px-2 py-1 text-sm text-gray-500">
+                        Nenhum entregador ativo
+                      </div>
+                    ) : (
+                      drivers.map((driver) => (
                         <SelectItem key={driver.id} value={driver.id}>
-                          {driver.name} {driver.phone && `- ${driver.phone}`}
+                          {driver.name} {driver.phone ? `- ${driver.phone}` : driver.email ? `- ${driver.email}` : ''}
                         </SelectItem>
-                      ))}
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

@@ -40,7 +40,7 @@ npm install
 ## 5) .env de produção
 Crie o arquivo `.env` com as variáveis necessárias (exemplo mínimo):
 ```
-DATABASE_URL="mysql://USER:PASS@HOST:3306/DB_NAME"
+DATABASE_URL="mysql://usuario:senha@127.0.0.1:3306/ejg_distribuidora"
 NEXT_PUBLIC_SITE_URL="https://ejgcestas.com"
 NEXTAUTH_SECRET="chave-secreta-segura"
 MERCADO_PAGO_ACCESS_TOKEN="APP_USR-xxxx"
@@ -127,4 +127,3 @@ mysqldump -h HOST -u USER -p DB_NAME > /root/db-backup-$(date +%F).sql
 - Acesso: https://ejgcestas.com
 - Webhook Mercado Pago: precisa de URL pública (usa `NEXT_PUBLIC_SITE_URL`)
 - Admin: https://ejgcestas.com/admin (usuário com role ADMIN)
-

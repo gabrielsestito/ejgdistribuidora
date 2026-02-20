@@ -47,6 +47,13 @@ const paymentLabels: Record<string, string> = {
   ESTORNADO: 'Estornado',
 }
 
+const paymentStatusColors: Record<string, string> = {
+  PENDENTE: 'bg-amber-100 text-amber-800',
+  PAGO: 'bg-emerald-100 text-emerald-800',
+  FALHOU: 'bg-red-100 text-red-800',
+  ESTORNADO: 'bg-purple-100 text-purple-800',
+}
+
 const paymentMethodLabels: Record<string, string> = {
   MERCADO_PAGO: 'Mercado Pago',
   PIX: 'Pix',
@@ -207,6 +214,25 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
     }
   }
 
+  const handleUnassign = async (orderId: string) => {
+    if (!confirm('Desatribuir entregador deste pedido?')) return
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/assign`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        alert(data?.error || 'Erro ao desatribuir entrega')
+        return
+      }
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId ? { ...o, deliveryAssignments: [] } : o
+        )
+      )
+    } catch (e) {
+      alert('Erro ao desatribuir entrega')
+    }
+  }
+
   const handleFilter = () => {
     const params = new URLSearchParams()
     if (statusFilter !== 'all') params.set('status', statusFilter)
@@ -351,8 +377,12 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
                         value={order.paymentStatus || 'PENDENTE'}
                         onValueChange={(value) => handlePaymentStatusChange(order.id, value)}
                       >
-                        <SelectTrigger className="h-8 w-32">
-                          <SelectValue />
+                        <SelectTrigger className="w-auto h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:ring-0 shadow-none">
+                          <SelectValue>
+                            <span className={cn('px-3 py-1.5 rounded-full text-xs font-semibold inline-block cursor-pointer hover:opacity-80 transition-opacity', paymentStatusColors[order.paymentStatus || 'PENDENTE'] || 'bg-gray-100 text-gray-800')}>
+                              {paymentLabels[order.paymentStatus || 'PENDENTE']}
+                            </span>
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {Object.entries(paymentLabels).map(([value, label]) => (
@@ -368,8 +398,12 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
                         value={order.paymentMethod || ''}
                         onValueChange={(value) => handlePaymentMethodChange(order.id, value)}
                       >
-                        <SelectTrigger className="h-8 w-40">
-                          <SelectValue placeholder="Selecionar" />
+                        <SelectTrigger className="w-auto h-auto p-0 border-0 bg-transparent hover:bg-transparent focus:ring-0 shadow-none">
+                          <SelectValue>
+                            <span className="px-3 py-1.5 rounded-full text-xs font-semibold inline-block cursor-pointer hover:opacity-80 transition-opacity bg-gray-100 text-gray-800">
+                              {order.paymentMethod ? paymentMethodLabels[order.paymentMethod] : 'Selecionar'}
+                            </span>
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           {Object.entries(paymentMethodLabels).map(([value, label]) => (
@@ -386,12 +420,22 @@ export function OrdersTable({ orders: initialOrders }: OrdersTableProps) {
                       )}
                     </TableCell>
                     <TableCell>
-                      {order.deliveryAssignments[0]?.driver.name || (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          asChild
-                        >
+                      {order.deliveryAssignments[0]?.driver?.name ? (
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800">
+                            {order.deliveryAssignments[0].driver.name}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Desatribuir entregador"
+                            onClick={() => handleUnassign(order.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button variant="outline" size="sm" asChild>
                           <Link href={`/admin/pedidos/${order.id}/atribuir`}>
                             <UserPlus className="mr-2 h-4 w-4" />
                             Atribuir

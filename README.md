@@ -173,8 +173,8 @@ sudo mysql_secure_installation
 
 sudo mysql
 CREATE DATABASE ejg_distribuidora CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'ejg'@'%' IDENTIFIED BY 'Biel0909055.';
-GRANT ALL PRIVILEGES ON ejg_distribuidora.* TO 'ejg'@'%';
+CREATE USER 'ejg'@'localhost' IDENTIFIED BY 'Biel0909055.';
+GRANT ALL PRIVILEGES ON ejg_distribuidora.* TO 'ejg'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -183,7 +183,7 @@ Obter código do projeto:
 - Opção Git:
 ```bash
 cd ~
-git clone https://github.com/gabrielsestito/ejgdistribuidora app
+  git clone https://github.com/gabrielsestito/ejgdistribuidora app
 cd app
 ```
 - Opção ZIP/SFTP:
@@ -199,7 +199,7 @@ nano .env
 
 Conteúdo mínimo recomendado:
 ```
-DATABASE_URL="mysql://root:Biel0909055.@HOST:3306/ejg_distribuidora"
+DATABASE_URL="mysql://root:Biel0909055.@127.0.0.1:3306/ejg_distribuidora"
 NEXTAUTH_SECRET="chave-muito-segura"
 NEXTAUTH_URL="https://ejgcestas.com"
 NEXT_PUBLIC_SITE_URL="https://ejgcestas.com"
@@ -218,7 +218,7 @@ EMAIL_FROM="EJG Distribuidora <cestacompletabasica26@gmail.com>"
 Build e banco:
 
 ```bash
-cd ~/app
+  cd ~/app
 npm ci
 npx prisma generate
 npx prisma db push

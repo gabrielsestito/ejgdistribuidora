@@ -6,7 +6,7 @@ import { DriverLayout } from '@/components/driver/driver-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Scan, Camera, X, AlertCircle } from 'lucide-react'
+import { Scan, Camera, X, AlertCircle, RefreshCw } from 'lucide-react'
 // @ts-ignore - html5-qrcode não tem tipos TypeScript oficiais
 import { Html5Qrcode } from 'html5-qrcode'
 
@@ -20,6 +20,9 @@ export default function ScannerPage() {
   const scannerRef = useRef<any>(null)
   const processingRef = useRef(false)
   const recentScansRef = useRef<Record<string, number>>({})
+  const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([])
+  const [currentCameraId, setCurrentCameraId] = useState<string | null>(null)
+  const [flash, setFlash] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   useEffect(() => {
     // Cleanup ao desmontar
@@ -40,6 +43,27 @@ export default function ScannerPage() {
     }
   }
 
+  const loadCameras = async () => {
+    try {
+      // html5-qrcode expõe getCameras via Html5Qrcode
+      // @ts-ignore
+      const list = await Html5Qrcode.getCameras()
+      const mapped = (list || []).map((c: any) => ({ id: c.id, label: c.label || `Câmera ${c.id}` }))
+      setCameras(mapped)
+      // Preferir câmera traseira
+      const preferred =
+        mapped.find((c) => /back|traseir|rear|environment/i.test(c.label))?.id ||
+        mapped[0]?.id ||
+        null
+      setCurrentCameraId(preferred)
+      return preferred
+    } catch {
+      setCameras([])
+      setCurrentCameraId(null)
+      return null
+    }
+  }
+
   const checkHTTPS = (): boolean => {
     if (typeof window === 'undefined') return true
     const isLocalhost = window.location.hostname === 'localhost' || 
@@ -49,7 +73,7 @@ export default function ScannerPage() {
     return isLocalhost || isHTTPS
   }
 
-  const startScanning = async () => {
+  const startScanning = async (cameraIdOverride?: string) => {
     try {
       setScannerLoading(true)
       setScanning(true)
@@ -71,11 +95,18 @@ export default function ScannerPage() {
         throw new Error('Nenhuma câmera encontrada no dispositivo.')
       }
 
-      // Aguardar um pouco para garantir que o DOM está pronto
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Aguardar o container aparecer no DOM
+      let container: HTMLElement | null = null
+      for (let i = 0; i < 20; i++) {
+        container = document.getElementById('scanner-container')
+        if (container) break
+        // aguarda ~50ms por tentativa, total ~1s
+        // garante render do container mesmo em dispositivos lentos
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
 
       // Verificar se o elemento existe
-      const container = document.getElementById('scanner-container')
       if (!container) {
         throw new Error('Erro ao inicializar o scanner. Tente recarregar a página.')
       }
@@ -83,50 +114,62 @@ export default function ScannerPage() {
       const scanner = new Html5Qrcode('scanner-container')
       scannerRef.current = scanner
 
-      // Tentar diferentes configurações de câmera
-      const cameraConfigs = [
-        { facingMode: 'environment' }, // Câmera traseira (preferida)
-        { facingMode: 'user' }, // Câmera frontal
-        { video: { facingMode: 'environment' } }, // Alternativa
-      ]
+      // Carregar lista de câmeras e escolher a preferida
+      const preferredId = cameraIdOverride || (await loadCameras())
 
       let started = false
       let lastError: any = null
 
-      for (const config of cameraConfigs) {
+      // Configuração do scanner
+      const config = {
+        fps: 12,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdgePercentage = 0.7
+          const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight)
+          const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage)
+          return { width: qrboxSize, height: qrboxSize }
+        },
+        // Aspect ratio mais comum em mobile
+        aspectRatio: 1.7778,
+        disableFlip: false,
+      } as any
+
+      const onSuccess = (decodedText: string) => {
+        if (!processingRef.current && !assigning) {
+          handleScan(decodedText)
+        }
+      }
+      const onError = (_err: string) => {
+        // silencioso durante varredura
+      }
+
+      // 1) Tentar com cameraId preferido (se existir)
+      if (preferredId) {
         try {
-          await scanner.start(
-            config,
-            {
-              fps: 10,
-              qrbox: (viewfinderWidth, viewfinderHeight) => {
-                const minEdgePercentage = 0.7
-                const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight)
-                const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage)
-                return {
-                  width: qrboxSize,
-                  height: qrboxSize,
-                }
-              },
-              aspectRatio: 1.0,
-              disableFlip: false,
-            },
-            (decodedText) => {
-              // QR Code detectado
-              if (!processingRef.current && !assigning) {
-                handleScan(decodedText)
-              }
-            },
-            (errorMessage) => {
-              // Ignorar erros de leitura (normal durante a varredura)
-            }
-          )
+          await scanner.start(preferredId, config, onSuccess, onError)
           started = true
-          break
-        } catch (error: any) {
-          lastError = error
-          // Tentar próxima configuração
-          continue
+        } catch (e) {
+          lastError = e
+        }
+      }
+
+      // 2) Fallback: tentar por constraints (facingMode) se falhar
+      if (!started) {
+        const cameraConstraints = [
+          { facingMode: { ideal: 'environment' } },
+          { facingMode: { ideal: 'user' } },
+          { facingMode: 'environment' },
+          { facingMode: 'user' },
+        ]
+        for (const constraints of cameraConstraints) {
+          try {
+            await scanner.start(constraints as any, config, onSuccess, onError)
+            started = true
+            break
+          } catch (e) {
+            lastError = e
+            continue
+          }
         }
       }
 
@@ -154,6 +197,8 @@ export default function ScannerPage() {
         success: false,
         message: errorMessage,
       })
+      setFlash({ type: 'error', text: errorMessage })
+      setTimeout(() => setFlash(null), 3000)
       setScanning(false)
       setScannerLoading(false)
     }
@@ -171,6 +216,23 @@ export default function ScannerPage() {
     }
     setScanning(false)
     setScannerLoading(false)
+  }
+
+  const switchCamera = async () => {
+    if (!cameras.length) return
+    try {
+      const idx = cameras.findIndex((c) => c.id === currentCameraId)
+      const next = cameras[(idx + 1) % cameras.length]
+      await stopScanning()
+      setCurrentCameraId(next.id)
+      await startScanning(next.id)
+    } catch (e) {
+      console.error('Error switching camera:', e)
+      setMessage({
+        success: false,
+        message: 'Não foi possível alternar a câmera.',
+      })
+    }
   }
 
   const handleScan = async (data: string) => {
@@ -211,17 +273,28 @@ export default function ScannerPage() {
           success: true,
           message: `Entrega atribuída com sucesso! Pedido: ${orderCode}`,
         })
+        setFlash({ type: 'success', text: 'Atribuída ao entregador' })
+        if (typeof navigator !== 'undefined' && (navigator as any).vibrate) {
+          try {
+            ;(navigator as any).vibrate(100)
+          } catch {}
+        }
+        setTimeout(() => setFlash(null), 2500)
       } else {
         setMessage({
           success: false,
           message: json.error || 'Erro ao atribuir entrega',
         })
+        setFlash({ type: 'error', text: json.error || 'Erro ao atribuir' })
+        setTimeout(() => setFlash(null), 3000)
       }
     } catch (error) {
       setMessage({
         success: false,
         message: 'Erro ao processar QR Code',
       })
+      setFlash({ type: 'error', text: 'Erro ao processar QR Code' })
+      setTimeout(() => setFlash(null), 3000)
     } finally {
       setAssigning(false)
       processingRef.current = false
@@ -313,7 +386,7 @@ export default function ScannerPage() {
                   </div>
                   <Button
                     size="lg"
-                    onClick={startScanning}
+                    onClick={() => startScanning()}
                     className="w-full h-12 gap-2"
                     disabled={scannerLoading}
                   >
@@ -332,56 +405,80 @@ export default function ScannerPage() {
                     <p className="text-gray-600">Iniciando câmera...</p>
                   </div>
                 )}
-                {!scannerLoading && (
-                  <>
-                    <div className="relative">
-                      <div
-                        id="scanner-container"
-                        className="w-full rounded-lg overflow-hidden bg-black"
-                        style={{ minHeight: '400px' }}
-                      />
-                      <div className="absolute top-4 right-4 z-10">
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          onClick={stopScanning}
-                          className="h-10 w-10"
-                        >
-                          <X className="h-5 w-5" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-blue-800 text-center">
-                        Posicione o QR Code dentro da área de leitura
-                      </p>
-                    </div>
-                    <div className="max-w-md mx-auto space-y-2">
-                      <Input
-                        type="text"
-                        placeholder="Ou digite o código manualmente"
-                        value={manualCode}
-                        onChange={(e) => setManualCode(e.target.value)}
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && !assigning) {
-                            stopScanning()
-                            handleManualCode(manualCode)
-                          }
-                        }}
-                        className="w-full h-11"
-                        disabled={assigning}
-                      />
-                      <Button
-                        variant="outline"
-                        className="w-full h-11"
-                        onClick={stopScanning}
-                        disabled={assigning}
-                      >
-                        Cancelar Scanner
-                      </Button>
-                    </div>
-                  </>
+            <>
+              <div className="relative">
+                <div
+                  id="scanner-container"
+                  className="w-full rounded-lg overflow-hidden bg-black"
+                  style={{ minHeight: '400px' }}
+                />
+                {flash && (
+                  <div
+                    className={`absolute top-4 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded shadow text-white ${
+                      flash.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+                    }`}
+                  >
+                    {flash.text}
+                  </div>
                 )}
+                <div className="absolute top-4 right-4 z-10 flex gap-2">
+                  {cameras.length > 1 && (
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={switchCamera}
+                      className="h-10 w-10"
+                      title="Trocar câmera"
+                    >
+                      <RefreshCw className="h-5 w-5" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    onClick={stopScanning}
+                    className="h-10 w-10"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+                {scannerLoading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white gap-3">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+                    <p>Iniciando câmera...</p>
+                  </div>
+                )}
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-blue-800 text-center">
+                  Posicione o QR Code dentro da área de leitura
+                </p>
+              </div>
+              <div className="max-w-md mx-auto space-y-2">
+                <Input
+                  type="text"
+                  placeholder="Ou digite o código manualmente"
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !assigning) {
+                      stopScanning()
+                      handleManualCode(manualCode)
+                    }
+                  }}
+                  className="w-full h-11"
+                  disabled={assigning}
+                />
+                <Button
+                  variant="outline"
+                  className="w-full h-11"
+                  onClick={stopScanning}
+                  disabled={assigning}
+                >
+                  Cancelar Scanner
+                </Button>
+              </div>
+            </>
               </div>
             )}
             {message && (

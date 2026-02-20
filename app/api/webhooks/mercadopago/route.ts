@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendPaymentConfirmedEmail, sendOrderStatusEmail } from '@/lib/email'
+import { sendPaymentConfirmedEmail } from '@/lib/email'
 
 const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN
 
@@ -98,14 +98,6 @@ export async function POST(req: NextRequest) {
             to: order.user.email,
             name: order.user.name,
             code: order.code,
-          })
-        } else {
-          await sendOrderStatusEmail({
-            to: order.user.email,
-            name: order.user.name,
-            code: order.code,
-            status: order.status,
-            paymentStatus,
           })
         }
       }

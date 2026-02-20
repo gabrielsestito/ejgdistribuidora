@@ -52,7 +52,7 @@ export function ShippingRatesTable() {
   const [configLoading, setConfigLoading] = useState(true)
   const [maxDistanceKm, setMaxDistanceKm] = useState<string>('100')
   const [savingConfig, setSavingConfig] = useState(false)
-  const [globalMinOrder, setGlobalMinOrder] = useState<string>('50')
+  const [globalMinOrder, setGlobalMinOrder] = useState<string>('1')
   const [freeCities, setFreeCities] = useState<Array<{ id: string; city: string; state: string; active: boolean }>>([])
   const [freeCityForm, setFreeCityForm] = useState({ city: '', state: 'SP', active: true })
   const [savingCity, setSavingCity] = useState(false)
