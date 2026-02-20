@@ -65,35 +65,59 @@ export async function POST(_: NextRequest) {
     }
 
     const config = parseDatabaseUrl()
-    const args = buildDumpArgs(config)
+    let dumpBuffer: Buffer | null = null
 
-    const dumpData = await new Promise<Buffer>((resolve, reject) => {
-      const child = spawn('mysqldump', args)
-      const stdout: Buffer[] = []
-      const stderr: Buffer[] = []
+    // Tentativa 1: usar binário mysqldump (mais rápido/robusto se instalado)
+    try {
+      const args = buildDumpArgs(config)
+      dumpBuffer = await new Promise<Buffer>((resolve, reject) => {
+        const child = spawn('mysqldump', args)
+        const stdout: Buffer[] = []
+        const stderr: Buffer[] = []
 
-      child.stdout.on('data', (data) => stdout.push(data))
-      child.stderr.on('data', (data) => stderr.push(data))
+        child.stdout.on('data', (data) => stdout.push(data))
+        child.stderr.on('data', (data) => stderr.push(data))
 
-      child.on('error', (error) => {
-        reject(error)
+        child.on('error', (error) => {
+          reject(error)
+        })
+
+        child.on('close', (code) => {
+          if (code !== 0) {
+            const errorMessage = Buffer.concat(stderr).toString() || 'Erro ao gerar backup'
+            reject(new Error(errorMessage))
+            return
+          }
+          resolve(Buffer.concat(stdout))
+        })
       })
-
-      child.on('close', (code) => {
-        if (code !== 0) {
-          const errorMessage = Buffer.concat(stderr).toString() || 'Erro ao gerar backup'
-          reject(new Error(errorMessage))
-          return
-        }
-        resolve(Buffer.concat(stdout))
+    } catch (e: any) {
+      // Tentativa 2: fallback para biblioteca JS 'mysqldump' (não requer binário)
+      const mysqldumpMod: any = await import('mysqldump')
+      const result = await mysqldumpMod.default({
+        connection: {
+          host: config.host,
+          port: Number(config.port),
+          user: config.user,
+          password: config.password,
+          database: config.database,
+        },
       })
-    })
+      const sql = [
+        result?.dump?.schema || '',
+        result?.dump?.trigger || '',
+        result?.dump?.data || '',
+      ]
+        .filter(Boolean)
+        .join('\n\n')
+      dumpBuffer = Buffer.from(sql, 'utf8')
+    }
 
     const filename = createFilename()
 
-    const arrayBuffer = dumpData.buffer.slice(
-      dumpData.byteOffset,
-      dumpData.byteOffset + dumpData.byteLength
+    const arrayBuffer = dumpBuffer.buffer.slice(
+      dumpBuffer.byteOffset,
+      dumpBuffer.byteOffset + dumpBuffer.byteLength
     )
     return new NextResponse(arrayBuffer as ArrayBuffer, {
       headers: {

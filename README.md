@@ -173,7 +173,7 @@ sudo mysql_secure_installation
 
 sudo mysql
 CREATE DATABASE ejg_distribuidora CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'ejg'@'%' IDENTIFIED BY 'SENHA_FORTE';
+CREATE USER 'ejg'@'%' IDENTIFIED BY 'Biel0909055.';
 GRANT ALL PRIVILEGES ON ejg_distribuidora.* TO 'ejg'@'%';
 FLUSH PRIVILEGES;
 EXIT;
@@ -183,7 +183,7 @@ Obter código do projeto:
 - Opção Git:
 ```bash
 cd ~
-git clone <URL_DO_REPO> app
+git clone https://github.com/gabrielsestito/ejgdistribuidora app
 cd app
 ```
 - Opção ZIP/SFTP:
@@ -199,19 +199,19 @@ nano .env
 
 Conteúdo mínimo recomendado:
 ```
-DATABASE_URL="mysql://USUARIO:SENHA@HOST:3306/ejg_distribuidora"
+DATABASE_URL="mysql://root:Biel0909055.@HOST:3306/ejg_distribuidora"
 NEXTAUTH_SECRET="chave-muito-segura"
 NEXTAUTH_URL="https://ejgcestas.com"
 NEXT_PUBLIC_SITE_URL="https://ejgcestas.com"
 NEXT_PUBLIC_APP_URL="https://ejgcestas.com"
 
 # Mercado Pago
-MERCADO_PAGO_ACCESS_TOKEN="APP_USR-xxxx"
+MERCADO_PAGO_ACCESS_TOKEN="APP_USR-2962762724024779-022015-6de7595f2fdc2143713e3df27d9d5aa6-1772729266"
 
 # E-mail (SMTP)
-EMAIL_USER="seuemail@provedor.com"
-EMAIL_PASS="senha-ou-token"
-EMAIL_FROM="EJG Distribuidora <seuemail@provedor.com>"
+EMAIL_USER="cestacompletabasica26@gmail.com"
+EMAIL_PASS="ypvn ajrw yqvf yupc "
+EMAIL_FROM="EJG Distribuidora <cestacompletabasica26@gmail.com>"
 # Use EMAIL_SERVICE="gmail" ou configure SMTP_HOST/SMTP_PORT
 ```
 

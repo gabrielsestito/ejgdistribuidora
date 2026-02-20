@@ -30,6 +30,7 @@
     "next": "14.0.4",
     "next-auth": "^4.24.5",
     "nodemailer": "^7.0.7",
+    "mysqldump": "^3.2.0",
     "qrcode.react": "^3.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
