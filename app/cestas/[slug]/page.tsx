@@ -202,7 +202,7 @@ export default function ProductPage() {
                     {product.description && (
                       <div>
                         <h3 className="text-sm font-semibold text-gray-800 mb-2">Descrição</h3>
-                        <p className="text-sm text-gray-700 leading-relaxed">
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
                           {product.description}
                         </p>
                       </div>
@@ -221,7 +221,7 @@ export default function ProductPage() {
                           {product.kitItems.map((item) => (
                             <div key={item.id} className="grid grid-cols-4 gap-2 text-sm border-b pb-2">
                               <div className="text-gray-700 font-medium">
-                                {item.quantity}x {item.unit || item.product.weightUnit || 'un'}
+                                {item.quantity} un
                               </div>
                               <div>
                                 <span className="font-medium">{item.product.name}</span>

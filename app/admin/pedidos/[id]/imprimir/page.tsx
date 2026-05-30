@@ -209,7 +209,12 @@ export default function PrintOrderPage() {
                   <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="border border-gray-300 px-2 py-1">
                       <div>
-                        <p className="font-medium">{item.product?.name || 'Produto removido'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{item.product?.name || 'Produto removido'}</p>
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] print:text-[7px] font-semibold uppercase ${item.sellingMode === 'PACK' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                            {item.sellingMode === 'PACK' ? 'Fardo' : 'Unidade'}
+                          </span>
+                        </div>
                         {item.product?.productType === 'KIT' && item.product?.kitItems && (
                           <div className="mt-1 pl-2 border-l-2 border-gray-300 text-[10px] print:text-[8px] text-gray-600">
                             {item.product.kitItems.map((kitItem: any, idx: number) => (

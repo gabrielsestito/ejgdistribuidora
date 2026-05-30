@@ -78,6 +78,7 @@ export function ProductForm({ product }: ProductFormProps) {
     weightUnit: string | null
   }[]>([])
   const [kitProductSearch, setKitProductSearch] = useState('')
+  const [kitItemsSearch, setKitItemsSearch] = useState('')
   const filteredProductsForKit = useMemo(
     () =>
       products.filter((p) =>
@@ -256,7 +257,6 @@ export function ProductForm({ product }: ProductFormProps) {
 
   const addKitItem = () => {
     setKitItems((prev) => [
-      ...prev,
       {
         productId: '',
         quantity: 1,
@@ -264,6 +264,7 @@ export function ProductForm({ product }: ProductFormProps) {
         brand: '',
         notes: '',
       },
+      ...prev,
     ])
   }
 
@@ -1083,22 +1084,33 @@ export function ProductForm({ product }: ProductFormProps) {
               <TabsContent value="kit" className="space-y-6 mt-6">
                 <Card className="border-gray-200/80 shadow-sm rounded-2xl bg-white/90">
                   <CardHeader className="border-b border-gray-100 bg-gradient-to-r from-primary/5 via-white to-transparent rounded-t-2xl">
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg font-semibold">Composição do Kit/Cesta</CardTitle>
-                      <div className="flex items-center gap-2">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <Input
-                            value={kitProductSearch}
-                            onChange={(e) => setKitProductSearch(e.target.value)}
-                            placeholder="Buscar produto..."
-                            className="pl-9 h-10 w-48"
-                          />
-                        </div>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex justify-between items-center">
+                        <CardTitle className="text-lg font-semibold">Composição do Kit/Cesta</CardTitle>
                         <Button type="button" onClick={addKitItem} size="sm" className="gap-2">
                           <Plus className="h-4 w-4" />
                           Adicionar Item
                         </Button>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            value={kitItemsSearch}
+                            onChange={(e) => setKitItemsSearch(e.target.value)}
+                            placeholder="Pesquisar nos itens adicionados..."
+                            className="pl-9 h-10 w-full bg-white/50"
+                          />
+                        </div>
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            value={kitProductSearch}
+                            onChange={(e) => setKitProductSearch(e.target.value)}
+                            placeholder="Filtrar produtos disponíveis..."
+                            className="pl-9 h-10 w-full bg-white/50"
+                          />
+                        </div>
                       </div>
                     </div>
                   </CardHeader>
@@ -1109,103 +1121,110 @@ export function ProductForm({ product }: ProductFormProps) {
                         <p className="text-sm text-gray-500">Clique em "Adicionar Item" para começar</p>
                       </div>
                     ) : (
-                      kitItems.map((item, index) => (
-                        <div key={index} className="p-5 border border-gray-200/80 rounded-2xl space-y-4 bg-white/80 shadow-sm hover:shadow-md transition-all">
-                          <div className="flex justify-between items-start">
-                            <h4 className="font-semibold text-gray-900">Item {index + 1}</h4>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => removeKitItem(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700 mb-2 block">Produto *</Label>
-                              <Select
-                                value={item.productId}
-                                onValueChange={(value) => handleKitProductChange(index, value)}
+                      kitItems
+                        .map((item, index) => ({ ...item, originalIndex: index }))
+                        .filter((item) => {
+                          if (!kitItemsSearch) return true
+                          const product = products.find((p) => p.id === item.productId)
+                          return (product?.name || '').toLowerCase().includes(kitItemsSearch.toLowerCase())
+                        })
+                        .map((item) => (
+                          <div key={item.originalIndex} className="p-5 border border-gray-200/80 rounded-2xl space-y-4 bg-white/80 shadow-sm hover:shadow-md transition-all">
+                            <div className="flex justify-between items-start">
+                              <h4 className="font-semibold text-gray-900">Item {item.originalIndex + 1}</h4>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => removeKitItem(item.originalIndex)}
                               >
-                                <SelectTrigger className="h-11">
-                                  <SelectValue placeholder="Selecione um produto" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {filteredProductsForKit.map((prod) => (
-                                    <SelectItem key={prod.id} value={prod.id}>
-                                      {prod.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              {item.productId && (
-                                <div className="mt-2 text-xs text-gray-500">
-                                  {(() => {
-                                    const info = getProductInfo(item.productId)
-                                    if (!info) return null
-                                    const weightLabel = info.weight ? `${info.weight} ${info.weightUnit || ''}`.trim() : 'não informado'
-                                    return (
-                                      <span>
-                                        Marca: {info.brand || 'não informada'} · Peso: {weightLabel}
-                                      </span>
-                                    )
-                                  })()}
-                                </div>
-                              )}
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700 mb-2 block">Quantidade *</Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) => updateKitItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                                className="h-11"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700 mb-2 block">Unidade</Label>
-                              <Select
-                                value={item.unit}
-                                onValueChange={(value) => updateKitItem(index, 'unit', value)}
-                              >
-                                <SelectTrigger className="h-11">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="g">g</SelectItem>
-                                  <SelectItem value="kg">kg</SelectItem>
-                                  <SelectItem value="ml">ml</SelectItem>
-                                  <SelectItem value="l">l</SelectItem>
-                                  <SelectItem value="un">un</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-sm font-medium text-gray-700 mb-2 block">Marca</Label>
-                              <Input
-                                value={item.brand}
-                                onChange={(e) => updateKitItem(index, 'brand', e.target.value)}
-                                placeholder="Opcional"
-                                className="h-11"
-                              />
-                            </div>
-                            <div className="col-span-2">
-                              <Label className="text-sm font-medium text-gray-700 mb-2 block">Observações</Label>
-                              <Textarea
-                                value={item.notes}
-                                onChange={(e) => updateKitItem(index, 'notes', e.target.value)}
-                                rows={2}
-                                placeholder="Observações sobre este item (opcional)"
-                                className="resize-none"
-                              />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Produto *</Label>
+                                <Select
+                                  value={item.productId}
+                                  onValueChange={(value) => handleKitProductChange(item.originalIndex, value)}
+                                >
+                                  <SelectTrigger className="h-11">
+                                    <SelectValue placeholder="Selecione um produto" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {filteredProductsForKit.map((prod) => (
+                                      <SelectItem key={prod.id} value={prod.id}>
+                                        {prod.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                {item.productId && (
+                                  <div className="mt-2 text-xs text-gray-500">
+                                    {(() => {
+                                      const info = getProductInfo(item.productId)
+                                      if (!info) return null
+                                      const weightLabel = info.weight ? `${info.weight} ${info.weightUnit || ''}`.trim() : 'não informado'
+                                      return (
+                                        <span>
+                                          Marca: {info.brand || 'não informada'} · Peso: {weightLabel}
+                                        </span>
+                                      )
+                                    })()}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Quantidade *</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => updateKitItem(item.originalIndex, 'quantity', parseInt(e.target.value) || 1)}
+                                  className="h-11"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Unidade</Label>
+                                <Select
+                                  value={item.unit}
+                                  onValueChange={(value) => updateKitItem(item.originalIndex, 'unit', value)}
+                                >
+                                  <SelectTrigger className="h-11">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="g">g</SelectItem>
+                                    <SelectItem value="kg">kg</SelectItem>
+                                    <SelectItem value="ml">ml</SelectItem>
+                                    <SelectItem value="l">l</SelectItem>
+                                    <SelectItem value="un">un</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div>
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Marca</Label>
+                                <Input
+                                  value={item.brand}
+                                  onChange={(e) => updateKitItem(item.originalIndex, 'brand', e.target.value)}
+                                  placeholder="Opcional"
+                                  className="h-11"
+                                />
+                              </div>
+                              <div className="col-span-2">
+                                <Label className="text-sm font-medium text-gray-700 mb-2 block">Observações</Label>
+                                <Textarea
+                                  value={item.notes}
+                                  onChange={(e) => updateKitItem(item.originalIndex, 'notes', e.target.value)}
+                                  rows={2}
+                                  placeholder="Observações sobre este item (opcional)"
+                                  className="resize-none"
+                                />
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))
+                        ))
                     )}
                   </CardContent>
                 </Card>

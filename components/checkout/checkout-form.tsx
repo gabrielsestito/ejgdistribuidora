@@ -372,6 +372,7 @@ export function CheckoutForm({ user }: CheckoutFormProps) {
           variantId: item.variantId || null,
           quantity: item.quantity,
           price: item.price,
+          sellingMode: item.variant || 'UNIT',
         })),
         paymentMethod: 'MERCADO_PAGO',
         subtotal: total,

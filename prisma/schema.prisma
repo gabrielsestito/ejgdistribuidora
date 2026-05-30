@@ -240,6 +240,7 @@ model OrderItem {
   basket    Basket?  @relation(fields: [basketId], references: [id])
   quantity  Int
   price     Decimal  @db.Decimal(10, 2) // Preço no momento da compra
+  sellingMode String? @default("UNIT") // UNIT or PACK
   createdAt DateTime @default(now())
 
   @@map("order_items")

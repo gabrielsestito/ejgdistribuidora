@@ -55,12 +55,23 @@ export async function POST(req: NextRequest) {
     failureUrl.searchParams.set('orderId', order.id)
     const webhookUrl = new URL('/api/webhooks/mercadopago', siteUrl).toString()
 
+    const preferenceItems = order.items.map((item) => ({
+      title: item.product?.name || 'Produto',
+      quantity: item.quantity,
+      unit_price: Number(item.price),
+    }))
+
+    // Adiciona o frete como um item se houver valor
+    if (order.shipping && Number(order.shipping) > 0) {
+      preferenceItems.push({
+        title: 'Frete',
+        quantity: 1,
+        unit_price: Number(order.shipping),
+      })
+    }
+
     const preferencePayload = {
-      items: order.items.map((item) => ({
-        title: item.product?.name || 'Produto',
-        quantity: item.quantity,
-        unit_price: Number(item.price),
-      })),
+      items: preferenceItems,
       payer: {
         name: order.user.name,
         email: order.user.email,

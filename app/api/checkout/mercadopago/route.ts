@@ -33,6 +33,7 @@ const orderSchema = z.object({
       variantId: z.string().optional().nullable(),
       quantity: z.number().int().positive(),
       price: z.number(),
+      sellingMode: z.string().optional().default('UNIT'),
     })
   ),
   paymentMethod: z.string().optional(),
@@ -136,6 +137,7 @@ export async function POST(req: NextRequest) {
             variantId: item.variantId || null,
             quantity: item.quantity,
             price: item.price,
+            sellingMode: item.sellingMode || 'UNIT',
           })),
         },
         statusLogs: {
@@ -186,12 +188,23 @@ export async function POST(req: NextRequest) {
       failure: failureUrl.toString(),
     }
 
+    const preferenceItems = order.items.map((item: any) => ({
+      title: item.product?.name || 'Produto',
+      quantity: item.quantity,
+      unit_price: Number(item.price),
+    }))
+
+    // Adiciona o frete como um item se houver valor
+    if (order.shipping && Number(order.shipping) > 0) {
+      preferenceItems.push({
+        title: 'Frete',
+        quantity: 1,
+        unit_price: Number(order.shipping),
+      })
+    }
+
     const preferencePayload = {
-      items: order.items.map((item: any) => ({
-        title: item.product?.name || 'Produto',
-        quantity: item.quantity,
-        unit_price: Number(item.price),
-      })),
+      items: preferenceItems,
       payer: {
         name: validated.customer.name,
         email: validated.customer.email,
